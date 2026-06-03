@@ -1,0 +1,69 @@
+{
+  "name": "trustabl",
+  "displayName": "Trustabl",
+  "description": "Agent reliability and safety findings from the Trustabl scanner, in your editor.",
+  "version": "0.1.0",
+  "publisher": "trustabl",
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/trustabl/trustabl-vscode" },
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Linters"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "trustabl.scanWorkspace", "title": "Trustabl: Scan Workspace" },
+      { "command": "trustabl.refreshRules", "title": "Trustabl: Refresh Rules and Scan" }
+    ],
+    "viewsContainers": {
+      "activitybar": [{ "id": "trustabl", "title": "Trustabl", "icon": "media/icon.svg" }]
+    },
+    "views": {
+      "trustabl": [{ "id": "trustablFindings", "name": "Findings" }]
+    },
+    "configuration": {
+      "title": "Trustabl",
+      "properties": {
+        "trustabl.path": { "type": "string", "default": "", "description": "Path to the trustabl binary. Empty = auto (PATH, then managed download)." },
+        "trustabl.scanOnSave": { "type": "boolean", "default": true, "description": "Run a scan when a relevant file is saved." },
+        "trustabl.detectors": { "type": "string", "default": "", "description": "Comma-separated detector categories (claude_sdk, openai_sdk, google_adk). Empty = all." },
+        "trustabl.strict": { "type": "boolean", "default": false, "description": "Pass --strict to the CLI (affects exit code only, not display)." },
+        "trustabl.minSeverity": { "type": "string", "enum": ["info", "low", "medium", "high", "critical"], "default": "info", "description": "Hide findings below this severity." },
+        "trustabl.scanTimeoutSeconds": { "type": "number", "default": 120, "description": "Kill a scan after this many seconds." },
+        "trustabl.rulesRepo": { "type": "string", "default": "", "description": "Override the rules repository URL (advanced)." },
+        "trustabl.rulesRef": { "type": "string", "default": "", "description": "Rules branch or tag (advanced)." }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./ && npm run copy:fixtures",
+    "copy:fixtures": "node -e \"const fs=require('fs');if(fs.existsSync('src/test/fixtures')){fs.rmSync('out/test/fixtures',{recursive:true,force:true});fs.cpSync('src/test/fixtures','out/test/fixtures',{recursive:true});}\"",
+    "bundle": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "pretest:unit": "npm run compile",
+    "test:unit": "mocha",
+    "pretest:int": "npm run compile",
+    "test:int": "vscode-test",
+    "vscode:prepublish": "npm run bundle",
+    "package": "vsce package",
+    "publish:vsce": "vsce publish",
+    "publish:ovsx": "ovsx publish"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.0",
+    "@types/tar": "^6.1.11",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-cli": "^0.0.9",
+    "@vscode/test-electron": "^2.3.9",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.20.0",
+    "mocha": "^10.3.0",
+    "ovsx": "^0.9.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "extract-zip": "^2.0.1",
+    "tar": "^6.2.0"
+  }
+}
