@@ -11,3 +11,4 @@ tsconfig.json
 **/*.map
 **/*.ts
 media/icon-source.svg
+PUBLISHING.md
