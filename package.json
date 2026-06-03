@@ -26,6 +26,7 @@
       "properties": {
         "trustabl.path": { "type": "string", "default": "", "description": "Path to the trustabl binary. Empty = auto (PATH, then managed download)." },
         "trustabl.scanOnSave": { "type": "boolean", "default": true, "description": "Run a scan when a relevant file is saved." },
+        "trustabl.scanOnOpen": { "type": "boolean", "default": true, "description": "Automatically scan the workspace when it is opened." },
         "trustabl.detectors": { "type": "string", "default": "", "description": "Comma-separated detector categories (claude_sdk, openai_sdk, google_adk). Empty = all." },
         "trustabl.strict": { "type": "boolean", "default": false, "description": "Pass --strict to the CLI (affects exit code only, not display)." },
         "trustabl.minSeverity": { "type": "string", "enum": ["info", "low", "medium", "high", "critical"], "default": "info", "description": "Hide findings below this severity." },

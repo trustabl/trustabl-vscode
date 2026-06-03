@@ -22,6 +22,8 @@ export function activate(ctx: vscode.ExtensionContext): void {
   output = vscode.window.createOutputChannel('Trustabl');
   status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
   status.text = 'Trustabl';
+  status.tooltip = 'Run a Trustabl scan';
+  status.command = 'trustabl.scanWorkspace';
   status.show();
 
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
@@ -30,10 +32,15 @@ export function activate(ctx: vscode.ExtensionContext): void {
   ctx.subscriptions.push(
     diagnostics, output, status,
     vscode.window.registerTreeDataProvider('trustablFindings', tree),
-    vscode.commands.registerCommand('trustabl.scanWorkspace', () => scan(ctx, false)),
-    vscode.commands.registerCommand('trustabl.refreshRules', () => scan(ctx, true)),
+    vscode.commands.registerCommand('trustabl.scanWorkspace', () => scan(ctx, false, false)),
+    vscode.commands.registerCommand('trustabl.refreshRules', () => scan(ctx, true, false)),
     vscode.workspace.onDidSaveTextDocument((doc) => onSave(ctx, doc)),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => maybeAutoScan(ctx)),
   );
+
+  output.appendLine('Trustabl: extension activated.');
+  // Auto-scan as soon as the extension loads with a folder open.
+  maybeAutoScan(ctx);
 }
 
 export function deactivate(): void {
@@ -41,17 +48,31 @@ export function deactivate(): void {
   inFlight?.cancel();
 }
 
+function maybeAutoScan(ctx: vscode.ExtensionContext): void {
+  const cfg = readConfig();
+  if (!cfg.scanOnOpen) return;
+  if (!vscode.workspace.workspaceFolders?.length) {
+    output.appendLine('Trustabl: no folder open at startup; will scan when a folder is opened.');
+    return;
+  }
+  void scan(ctx, false, true);
+}
+
 function onSave(ctx: vscode.ExtensionContext, doc: vscode.TextDocument): void {
   const cfg = readConfig();
   if (!cfg.scanOnSave) return;
   if (!RELEVANT.test(doc.fileName)) return;
   if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => scan(ctx, false), 750);
+  debounceTimer = setTimeout(() => scan(ctx, false, true), 750);
 }
 
-async function scan(ctx: vscode.ExtensionContext, freshRules: boolean): Promise<void> {
+async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boolean): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
-  if (!folder) return;
+  if (!folder) {
+    output.appendLine('Trustabl: no workspace folder open; nothing to scan.');
+    if (!auto) vscode.window.showInformationMessage('Trustabl: open a folder to scan a repo.');
+    return;
+  }
   const root = folder.uri.fsPath;
   const cfg = readConfig();
 
@@ -68,24 +89,27 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean): Promise<
   } catch (e) {
     status.text = '$(error) Trustabl';
     const msg = e instanceof BinaryUnavailableError ? e.message : String(e);
-    output.appendLine(`binary error: ${msg}`);
+    output.appendLine(`Trustabl: binary error: ${msg}`);
     vscode.window.showErrorMessage(`Trustabl: ${msg}`, 'Install Instructions').then((pick) => {
       if (pick) vscode.env.openExternal(vscode.Uri.parse('https://github.com/trustabl/trustabl#install'));
     });
     return;
   }
 
-  // First scan of the session fetches rules; later on-save scans use the cache.
+  // First scan of the session fetches rules; later on-save/auto scans use the cache.
   const cachedRules = !freshRules && rulesWarmed;
+  output.appendLine(`Trustabl: scanning ${root} (rules: ${cachedRules ? 'cached' : 'fetch'}; binary: ${binary})`);
   const outcome = await runScan(binary, root, toScanOptions(cfg, cachedRules), token);
   if (cancelled) return;
   inFlight = undefined;
 
   if (!outcome.ok) {
     status.text = '$(error) Trustabl';
-    output.appendLine(`scan ${outcome.kind}: ${outcome.error}`);
+    output.appendLine(`Trustabl: scan ${outcome.kind}: ${outcome.error}`);
     if (outcome.kind === 'scan' && /no usable rules/i.test(outcome.error)) {
       vscode.window.showWarningMessage('Trustabl: no usable rules. Run "Trustabl: Refresh Rules and Scan" with a network connection.');
+    } else if (!auto) {
+      vscode.window.showErrorMessage(`Trustabl scan failed (${outcome.kind}): ${outcome.error}`);
     }
     return;
   }
@@ -97,7 +121,8 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean): Promise<
 
   const total = outcome.result.findings.length;
   status.text = total > 0 ? `$(warning) Trustabl: ${total}` : '$(check) Trustabl';
+  output.appendLine(`Trustabl: done, ${total} finding(s).`);
   if (outcome.result.coverage.files_skipped > 0) {
-    output.appendLine(`note: ${outcome.result.coverage.files_skipped} file(s) skipped; findings may be incomplete`);
+    output.appendLine(`Trustabl: note: ${outcome.result.coverage.files_skipped} file(s) skipped; findings may be incomplete.`);
   }
 }

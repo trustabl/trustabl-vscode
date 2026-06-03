@@ -5,6 +5,7 @@ import { ScanOptions } from './runner';
 export interface TrustablConfig {
   path: string;
   scanOnSave: boolean;
+  scanOnOpen: boolean;
   detectors: string;
   strict: boolean;
   minSeverity: Severity;
@@ -18,6 +19,7 @@ export function readConfig(): TrustablConfig {
   return {
     path: c.get<string>('path', ''),
     scanOnSave: c.get<boolean>('scanOnSave', true),
+    scanOnOpen: c.get<boolean>('scanOnOpen', true),
     detectors: c.get<string>('detectors', ''),
     strict: c.get<boolean>('strict', false),
     minSeverity: c.get<Severity>('minSeverity', 'info'),
