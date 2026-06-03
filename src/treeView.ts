@@ -1,22 +1,22 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { GroupBy, ScanResult, Severity } from './types';
-import { buildTree, TreeNode } from './treeModel';
+import { TreeNode } from './treeModel';
 
-export class FindingsTreeProvider implements vscode.TreeDataProvider<TreeNode> {
+// Generic provider that renders a flat-or-nested list of TreeNodes. Used for
+// the Findings, Scores, and Help views (each is its own section/view).
+export class NodeTreeProvider implements vscode.TreeDataProvider<TreeNode> {
   private readonly _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChange.event;
   private roots: TreeNode[] = [];
 
   constructor(private workspaceRoot: string) {}
 
-  update(result: ScanResult, minSeverity: Severity, groupBy: GroupBy): void {
-    this.roots = buildTree(result, minSeverity, groupBy);
-    this._onDidChange.fire();
+  setRoot(root: string): void {
+    this.workspaceRoot = root;
   }
 
-  clear(): void {
-    this.roots = [];
+  setNodes(nodes: TreeNode[]): void {
+    this.roots = nodes;
     this._onDidChange.fire();
   }
 
@@ -30,13 +30,13 @@ export class FindingsTreeProvider implements vscode.TreeDataProvider<TreeNode> {
       : vscode.TreeItemCollapsibleState.None;
     const item = new vscode.TreeItem(node.label, collapsible);
     item.description = node.description;
+    if (node.icon) item.iconPath = new vscode.ThemeIcon(node.icon);
+
     if (node.finding) {
       item.tooltip = node.finding.explanation;
-      item.command = {
-        command: 'trustabl.showFinding',
-        title: 'Show finding',
-        arguments: [node.finding],
-      };
+      item.command = { command: 'trustabl.showFinding', title: 'Show finding', arguments: [node.finding] };
+    } else if (node.url) {
+      item.command = { command: 'vscode.open', title: 'Open', arguments: [vscode.Uri.parse(node.url)] };
     } else if (node.file) {
       const abs = path.resolve(this.workspaceRoot, node.file);
       const line = (node.line ?? 1) - 1;

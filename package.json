@@ -26,8 +26,15 @@
       "activitybar": [{ "id": "trustabl", "title": "Trustabl", "icon": "media/icon.svg" }]
     },
     "views": {
-      "trustabl": [{ "id": "trustablFindings", "name": "Findings" }]
+      "trustabl": [
+        { "id": "trustablFindings", "name": "Findings" },
+        { "id": "trustablScores", "name": "Scores" },
+        { "id": "trustablHelp", "name": "Help & Feedback" }
+      ]
     },
+    "viewsWelcome": [
+      { "view": "trustablFindings", "contents": "No Trustabl findings to show yet.\nRun a scan to populate this view.\n[Scan workspace](command:trustabl.scanWorkspace)" }
+    ],
     "configuration": {
       "title": "Trustabl",
       "properties": {

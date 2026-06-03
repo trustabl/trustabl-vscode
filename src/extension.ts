@@ -5,9 +5,9 @@ import { runScan } from './runner';
 import { Canceller } from './process';
 import { buildDiagnostics } from './diagnostics';
 import { publishDiagnostics } from './diagnosticsView';
-import { FindingsTreeProvider } from './treeView';
-import { TreeNode } from './treeModel';
-import { Finding, ScanResult } from './types';
+import { NodeTreeProvider } from './treeView';
+import { buildFindings, buildScores, buildHelp, findingsCount, TreeNode } from './treeModel';
+import { Finding, GroupBy, ScanResult, Severity } from './types';
 import { showFinding, setRoot as setDetailRoot } from './detailView';
 
 const RELEVANT = /\.(py|ts|tsx|mts|cts)$|\.claude[\\/]agents[\\/].*\.md$|(pyproject\.toml|requirements\.txt|Pipfile|poetry\.lock|package\.json|go\.mod)$/;
@@ -15,8 +15,9 @@ const RELEVANT = /\.(py|ts|tsx|mts|cts)$|\.claude[\\/]agents[\\/].*\.md$|(pyproj
 let diagnostics: vscode.DiagnosticCollection;
 let status: vscode.StatusBarItem;
 let output: vscode.OutputChannel;
-let tree: FindingsTreeProvider;
-let treeView: vscode.TreeView<TreeNode>;
+let findings: NodeTreeProvider;
+let scores: NodeTreeProvider;
+let findingsView: vscode.TreeView<TreeNode>;
 let debounceTimer: NodeJS.Timeout | undefined;
 let inFlight: { cancel: () => void } | undefined;
 let rulesWarmed = false;
@@ -33,12 +34,17 @@ export function activate(ctx: vscode.ExtensionContext): void {
   status.show();
 
   currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
-  tree = new FindingsTreeProvider(currentRoot);
-  treeView = vscode.window.createTreeView('trustablFindings', { treeDataProvider: tree });
+  findings = new NodeTreeProvider(currentRoot);
+  scores = new NodeTreeProvider(currentRoot);
+  const help = new NodeTreeProvider(currentRoot);
+  help.setNodes(buildHelp());
+  findingsView = vscode.window.createTreeView('trustablFindings', { treeDataProvider: findings });
+  const scoresView = vscode.window.createTreeView('trustablScores', { treeDataProvider: scores });
+  const helpView = vscode.window.createTreeView('trustablHelp', { treeDataProvider: help });
   setDetailRoot(currentRoot);
 
   ctx.subscriptions.push(
-    diagnostics, output, status, treeView,
+    diagnostics, output, status, findingsView, scoresView, helpView,
     vscode.commands.registerCommand('trustabl.scanWorkspace', () => scan(ctx, false, false)),
     vscode.commands.registerCommand('trustabl.refreshRules', () => scan(ctx, true, false)),
     vscode.commands.registerCommand('trustabl.showFinding', (f: Finding) => showFinding(f)),
@@ -53,7 +59,6 @@ export function activate(ctx: vscode.ExtensionContext): void {
   );
 
   output.appendLine('Trustabl: extension activated.');
-  // Auto-scan as soon as the extension loads with a folder open.
   maybeAutoScan(ctx);
 }
 
@@ -62,12 +67,20 @@ export function deactivate(): void {
   inFlight?.cancel();
 }
 
-// Re-render diagnostics + tree from the last scan, without re-scanning.
+function render(result: ScanResult, minSeverity: Severity, groupBy: GroupBy): void {
+  publishDiagnostics(diagnostics, buildDiagnostics(result, currentRoot, minSeverity));
+  findings.setNodes(buildFindings(result, minSeverity, groupBy));
+  scores.setNodes(buildScores(result));
+  const n = findingsCount(result, minSeverity);
+  findingsView.badge = n > 0 ? { value: n, tooltip: `${n} Trustabl finding(s)` } : undefined;
+  findingsView.description = n > 0 ? `${n}` : undefined;
+}
+
+// Re-render from the last scan (e.g. when grouping / min-severity changes).
 function rerender(): void {
   if (!lastResult) return;
   const cfg = readConfig();
-  publishDiagnostics(diagnostics, buildDiagnostics(lastResult, currentRoot, cfg.minSeverity));
-  tree.update(lastResult, cfg.minSeverity, cfg.groupBy);
+  render(lastResult, cfg.minSeverity, cfg.groupBy);
 }
 
 async function pickGroupBy(): Promise<void> {
@@ -111,10 +124,11 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
   }
   const root = folder.uri.fsPath;
   currentRoot = root;
+  findings.setRoot(root);
+  scores.setRoot(root);
   setDetailRoot(root);
   const cfg = readConfig();
 
-  // Supersede any in-flight scan.
   inFlight?.cancel();
   let cancelled = false;
   const token: Canceller = { onCancel: (cb) => { inFlight = { cancel: () => { cancelled = true; cb(); } }; } };
@@ -126,7 +140,7 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
     binary = await resolveBinary(ctx, cfg.path);
   } catch (e) {
     status.text = '$(error) Trustabl';
-    treeView.badge = undefined;
+    findingsView.badge = undefined;
     const msg = e instanceof BinaryUnavailableError ? e.message : String(e);
     output.appendLine(`Trustabl: binary error: ${msg}`);
     vscode.window.showErrorMessage(`Trustabl: ${msg}`, 'Install Instructions').then((pick) => {
@@ -135,7 +149,6 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
     return;
   }
 
-  // First scan of the session fetches rules; later on-save/auto scans use the cache.
   const cachedRules = !freshRules && rulesWarmed;
   output.appendLine(`Trustabl: scanning ${root} (rules: ${cachedRules ? 'cached' : 'fetch'}; binary: ${binary})`);
   const outcome = await runScan(binary, root, toScanOptions(cfg, cachedRules), token);
@@ -144,7 +157,7 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
 
   if (!outcome.ok) {
     status.text = '$(error) Trustabl';
-    treeView.badge = undefined;
+    findingsView.badge = undefined;
     output.appendLine(`Trustabl: scan ${outcome.kind}: ${outcome.error}`);
     if (outcome.kind === 'scan' && /no usable rules/i.test(outcome.error)) {
       vscode.window.showWarningMessage('Trustabl: no usable rules. Run "Trustabl: Refresh Rules and Scan" with a network connection.');
@@ -156,13 +169,11 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
 
   rulesWarmed = true;
   lastResult = outcome.result;
-  publishDiagnostics(diagnostics, buildDiagnostics(outcome.result, root, cfg.minSeverity));
-  tree.update(outcome.result, cfg.minSeverity, cfg.groupBy);
+  render(outcome.result, cfg.minSeverity, cfg.groupBy);
 
-  const total = outcome.result.findings.length;
-  status.text = total > 0 ? `$(warning) Trustabl: ${total}` : '$(check) Trustabl';
-  treeView.badge = total > 0 ? { value: total, tooltip: `${total} Trustabl finding(s)` } : undefined;
-  output.appendLine(`Trustabl: done, ${total} finding(s).`);
+  const n = findingsCount(outcome.result, cfg.minSeverity);
+  status.text = n > 0 ? `$(warning) Trustabl: ${n}` : '$(check) Trustabl';
+  output.appendLine(`Trustabl: done, ${outcome.result.findings.length} finding(s).`);
   if (outcome.result.coverage.files_skipped > 0) {
     output.appendLine(`Trustabl: note: ${outcome.result.coverage.files_skipped} file(s) skipped; findings may be incomplete.`);
   }
