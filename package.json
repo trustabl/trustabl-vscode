@@ -42,7 +42,7 @@
     "watch": "node esbuild.js --watch",
     "pretest:unit": "npm run compile",
     "test:unit": "mocha",
-    "pretest:int": "npm run compile",
+    "pretest:int": "npm run compile && npm run bundle",
     "test:int": "vscode-test",
     "vscode:prepublish": "npm run bundle",
     "package": "vsce package",
