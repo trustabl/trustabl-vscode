@@ -6,6 +6,7 @@ import { Canceller } from './process';
 import { buildDiagnostics } from './diagnostics';
 import { publishDiagnostics } from './diagnosticsView';
 import { FindingsTreeProvider } from './treeView';
+import { TreeNode } from './treeModel';
 
 const RELEVANT = /\.(py|ts|tsx|mts|cts)$|\.claude[\\/]agents[\\/].*\.md$|(pyproject\.toml|requirements\.txt|Pipfile|poetry\.lock|package\.json|go\.mod)$/;
 
@@ -13,6 +14,7 @@ let diagnostics: vscode.DiagnosticCollection;
 let status: vscode.StatusBarItem;
 let output: vscode.OutputChannel;
 let tree: FindingsTreeProvider;
+let treeView: vscode.TreeView<TreeNode>;
 let debounceTimer: NodeJS.Timeout | undefined;
 let inFlight: { cancel: () => void } | undefined;
 let rulesWarmed = false;
@@ -28,10 +30,10 @@ export function activate(ctx: vscode.ExtensionContext): void {
 
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
   tree = new FindingsTreeProvider(root);
+  treeView = vscode.window.createTreeView('trustablFindings', { treeDataProvider: tree });
 
   ctx.subscriptions.push(
-    diagnostics, output, status,
-    vscode.window.registerTreeDataProvider('trustablFindings', tree),
+    diagnostics, output, status, treeView,
     vscode.commands.registerCommand('trustabl.scanWorkspace', () => scan(ctx, false, false)),
     vscode.commands.registerCommand('trustabl.refreshRules', () => scan(ctx, true, false)),
     vscode.workspace.onDidSaveTextDocument((doc) => onSave(ctx, doc)),
@@ -88,6 +90,7 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
     binary = await resolveBinary(ctx, cfg.path);
   } catch (e) {
     status.text = '$(error) Trustabl';
+    treeView.badge = undefined;
     const msg = e instanceof BinaryUnavailableError ? e.message : String(e);
     output.appendLine(`Trustabl: binary error: ${msg}`);
     vscode.window.showErrorMessage(`Trustabl: ${msg}`, 'Install Instructions').then((pick) => {
@@ -105,6 +108,7 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
 
   if (!outcome.ok) {
     status.text = '$(error) Trustabl';
+    treeView.badge = undefined;
     output.appendLine(`Trustabl: scan ${outcome.kind}: ${outcome.error}`);
     if (outcome.kind === 'scan' && /no usable rules/i.test(outcome.error)) {
       vscode.window.showWarningMessage('Trustabl: no usable rules. Run "Trustabl: Refresh Rules and Scan" with a network connection.');
@@ -121,6 +125,7 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
 
   const total = outcome.result.findings.length;
   status.text = total > 0 ? `$(warning) Trustabl: ${total}` : '$(check) Trustabl';
+  treeView.badge = total > 0 ? { value: total, tooltip: `${total} Trustabl finding(s)` } : undefined;
   output.appendLine(`Trustabl: done, ${total} finding(s).`);
   if (outcome.result.coverage.files_skipped > 0) {
     output.appendLine(`Trustabl: note: ${outcome.result.coverage.files_skipped} file(s) skipped; findings may be incomplete.`);
