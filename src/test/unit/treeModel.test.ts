@@ -39,6 +39,7 @@ describe('buildScores', () => {
   it('lists overall and per-surface scores plus the skip note', () => {
     const labels = buildScores(result).map((n) => n.label);
     assert.ok(labels.some((l) => l.toLowerCase().includes('overall')));
+    assert.ok(labels.some((l) => l.includes('60%'))); // overall_score 0.6 -> 60%
     assert.ok(labels.some((l) => l.startsWith('tool fetch_url')));
     assert.ok(labels.some((l) => l.includes('skipped')));
   });

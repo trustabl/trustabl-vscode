@@ -74,10 +74,11 @@ export function buildFindings(result: ScanResult, minSeverity: Severity, groupBy
 
 // Top-level nodes for the Scores view.
 export function buildScores(result: ScanResult): TreeNode[] {
+  const pct = (x: number): string => `${Math.round(x * 100)}%`;
   const nodes: TreeNode[] = [
-    { label: `Overall readiness: ${result.overall_score.toFixed(2)}`, icon: 'dashboard' },
+    { label: `Overall readiness: ${pct(result.overall_score)}`, icon: 'dashboard' },
     ...result.surfaces.map((s) => ({
-      label: `${s.kind}${s.name ? ' ' + s.name : ''}: ${s.score.toFixed(2)}`,
+      label: `${s.kind}${s.name ? ' ' + s.name : ''}: ${pct(s.score)}`,
       description: `${s.finding_count} finding(s)`,
       file: s.file_path || undefined,
       icon: 'symbol-number',
