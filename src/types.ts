@@ -1,5 +1,6 @@
 export type Severity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 export type Scope = 'tool' | 'agent' | 'subagent' | 'repo' | '';
+export type GroupBy = 'severity' | 'file' | 'scope' | 'rule';
 
 export const SEVERITY_RANK: Record<Severity, number> = {
   info: 0, low: 1, medium: 2, high: 3, critical: 4,

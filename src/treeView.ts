@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { ScanResult, Severity } from './types';
+import { GroupBy, ScanResult, Severity } from './types';
 import { buildTree, TreeNode } from './treeModel';
 
 export class FindingsTreeProvider implements vscode.TreeDataProvider<TreeNode> {
@@ -10,8 +10,8 @@ export class FindingsTreeProvider implements vscode.TreeDataProvider<TreeNode> {
 
   constructor(private workspaceRoot: string) {}
 
-  update(result: ScanResult, minSeverity: Severity): void {
-    this.roots = buildTree(result, minSeverity);
+  update(result: ScanResult, minSeverity: Severity, groupBy: GroupBy): void {
+    this.roots = buildTree(result, minSeverity, groupBy);
     this._onDidChange.fire();
   }
 

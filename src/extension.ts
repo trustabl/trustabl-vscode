@@ -7,7 +7,7 @@ import { buildDiagnostics } from './diagnostics';
 import { publishDiagnostics } from './diagnosticsView';
 import { FindingsTreeProvider } from './treeView';
 import { TreeNode } from './treeModel';
-import { Finding } from './types';
+import { Finding, ScanResult } from './types';
 import { showFinding, setRoot as setDetailRoot } from './detailView';
 
 const RELEVANT = /\.(py|ts|tsx|mts|cts)$|\.claude[\\/]agents[\\/].*\.md$|(pyproject\.toml|requirements\.txt|Pipfile|poetry\.lock|package\.json|go\.mod)$/;
@@ -20,6 +20,8 @@ let treeView: vscode.TreeView<TreeNode>;
 let debounceTimer: NodeJS.Timeout | undefined;
 let inFlight: { cancel: () => void } | undefined;
 let rulesWarmed = false;
+let lastResult: ScanResult | undefined;
+let currentRoot = '';
 
 export function activate(ctx: vscode.ExtensionContext): void {
   diagnostics = vscode.languages.createDiagnosticCollection('trustabl');
@@ -30,18 +32,24 @@ export function activate(ctx: vscode.ExtensionContext): void {
   status.command = 'trustabl.scanWorkspace';
   status.show();
 
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
-  tree = new FindingsTreeProvider(root);
+  currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+  tree = new FindingsTreeProvider(currentRoot);
   treeView = vscode.window.createTreeView('trustablFindings', { treeDataProvider: tree });
-  setDetailRoot(root);
+  setDetailRoot(currentRoot);
 
   ctx.subscriptions.push(
     diagnostics, output, status, treeView,
     vscode.commands.registerCommand('trustabl.scanWorkspace', () => scan(ctx, false, false)),
     vscode.commands.registerCommand('trustabl.refreshRules', () => scan(ctx, true, false)),
     vscode.commands.registerCommand('trustabl.showFinding', (f: Finding) => showFinding(f)),
+    vscode.commands.registerCommand('trustabl.groupBy', () => pickGroupBy()),
     vscode.workspace.onDidSaveTextDocument((doc) => onSave(ctx, doc)),
     vscode.workspace.onDidChangeWorkspaceFolders(() => maybeAutoScan(ctx)),
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('trustabl.groupBy') || e.affectsConfiguration('trustabl.minSeverity')) {
+        rerender();
+      }
+    }),
   );
 
   output.appendLine('Trustabl: extension activated.');
@@ -52,6 +60,28 @@ export function activate(ctx: vscode.ExtensionContext): void {
 export function deactivate(): void {
   if (debounceTimer) clearTimeout(debounceTimer);
   inFlight?.cancel();
+}
+
+// Re-render diagnostics + tree from the last scan, without re-scanning.
+function rerender(): void {
+  if (!lastResult) return;
+  const cfg = readConfig();
+  publishDiagnostics(diagnostics, buildDiagnostics(lastResult, currentRoot, cfg.minSeverity));
+  tree.update(lastResult, cfg.minSeverity, cfg.groupBy);
+}
+
+async function pickGroupBy(): Promise<void> {
+  const items: Array<vscode.QuickPickItem & { value: string }> = [
+    { label: 'Severity', value: 'severity' },
+    { label: 'File', value: 'file' },
+    { label: 'Scope', value: 'scope' },
+    { label: 'Rule', value: 'rule' },
+  ];
+  const choice = await vscode.window.showQuickPick(items, { placeHolder: 'Group Trustabl findings by…' });
+  if (choice) {
+    await vscode.workspace.getConfiguration('trustabl')
+      .update('groupBy', choice.value, vscode.ConfigurationTarget.Workspace);
+  }
 }
 
 function maybeAutoScan(ctx: vscode.ExtensionContext): void {
@@ -80,6 +110,7 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
     return;
   }
   const root = folder.uri.fsPath;
+  currentRoot = root;
   setDetailRoot(root);
   const cfg = readConfig();
 
@@ -124,9 +155,9 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
   }
 
   rulesWarmed = true;
-  const map = buildDiagnostics(outcome.result, root, cfg.minSeverity);
-  publishDiagnostics(diagnostics, map);
-  tree.update(outcome.result, cfg.minSeverity);
+  lastResult = outcome.result;
+  publishDiagnostics(diagnostics, buildDiagnostics(outcome.result, root, cfg.minSeverity));
+  tree.update(outcome.result, cfg.minSeverity, cfg.groupBy);
 
   const total = outcome.result.findings.length;
   status.text = total > 0 ? `$(warning) Trustabl: ${total}` : '$(check) Trustabl';

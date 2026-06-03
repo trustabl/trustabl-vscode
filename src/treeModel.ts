@@ -1,4 +1,4 @@
-import { Finding, ScanResult, Severity, SEVERITY_RANK } from './types';
+import { Finding, GroupBy, ScanResult, Severity, SEVERITY_RANK } from './types';
 
 export interface TreeNode {
   label: string;
@@ -13,25 +13,51 @@ export interface TreeNode {
 
 const ORDER: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
-export function buildTree(result: ScanResult, minSeverity: Severity): TreeNode[] {
+function findingNode(f: Finding): TreeNode {
+  return {
+    label: f.rule_id,
+    description: f.title,
+    file: f.file_path || undefined,
+    line: f.line || undefined,
+    finding: f,
+  };
+}
+
+function groupFindings(findings: Finding[], groupBy: GroupBy): TreeNode[] {
+  if (groupBy === 'severity') {
+    const out: TreeNode[] = [];
+    for (const sev of ORDER) {
+      const items = findings.filter((f) => f.severity === sev);
+      if (items.length) out.push({ label: `${sev} (${items.length})`, children: items.map(findingNode) });
+    }
+    return out;
+  }
+  const keyOf = (f: Finding): string => {
+    if (groupBy === 'file') return f.file_path || '(repository)';
+    if (groupBy === 'scope') return f.scope || 'meta';
+    return f.rule_id; // 'rule'
+  };
+  const groups = new Map<string, Finding[]>();
+  for (const f of findings) {
+    const k = keyOf(f);
+    const arr = groups.get(k);
+    if (arr) { arr.push(f); } else { groups.set(k, [f]); }
+  }
+  return [...groups.keys()].sort().map((k) => ({
+    label: `${k} (${groups.get(k)!.length})`,
+    children: groups.get(k)!.map(findingNode),
+  }));
+}
+
+export function buildTree(result: ScanResult, minSeverity: Severity, groupBy: GroupBy = 'severity'): TreeNode[] {
   const floor = SEVERITY_RANK[minSeverity];
   const shown = result.findings.filter((f) => SEVERITY_RANK[f.severity] >= floor);
-
-  const severityBuckets: TreeNode[] = [];
-  for (const sev of ORDER) {
-    const items = shown.filter((f) => f.severity === sev);
-    if (items.length === 0) continue;
-    severityBuckets.push({
-      label: `${sev} (${items.length})`,
-      children: items.map((f) => ({
-        label: f.rule_id,
-        description: f.title,
-        file: f.file_path || undefined,
-        line: f.line || undefined,
-        finding: f,
-      })),
-    });
-  }
+  // Deterministic order within groups: severity desc, then rule, file, line.
+  shown.sort((a, b) =>
+    (SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]) ||
+    a.rule_id.localeCompare(b.rule_id) ||
+    a.file_path.localeCompare(b.file_path) ||
+    (a.line - b.line));
 
   const scoreChildren: TreeNode[] = [
     { label: `Overall: ${result.overall_score.toFixed(2)}` },
@@ -43,7 +69,7 @@ export function buildTree(result: ScanResult, minSeverity: Severity): TreeNode[]
   ];
 
   const roots: TreeNode[] = [
-    { label: 'Findings', children: severityBuckets },
+    { label: `Findings (${shown.length})`, children: groupFindings(shown, groupBy) },
     { label: 'Scores', children: scoreChildren },
   ];
   if (result.coverage.files_skipped > 0) {
