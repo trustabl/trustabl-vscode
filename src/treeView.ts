@@ -30,7 +30,14 @@ export class FindingsTreeProvider implements vscode.TreeDataProvider<TreeNode> {
       : vscode.TreeItemCollapsibleState.None;
     const item = new vscode.TreeItem(node.label, collapsible);
     item.description = node.description;
-    if (node.file) {
+    if (node.finding) {
+      item.tooltip = node.finding.explanation;
+      item.command = {
+        command: 'trustabl.showFinding',
+        title: 'Show finding',
+        arguments: [node.finding],
+      };
+    } else if (node.file) {
       const abs = path.resolve(this.workspaceRoot, node.file);
       const line = (node.line ?? 1) - 1;
       item.command = {

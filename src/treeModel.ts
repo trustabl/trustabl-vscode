@@ -1,4 +1,4 @@
-import { ScanResult, Severity, SEVERITY_RANK } from './types';
+import { Finding, ScanResult, Severity, SEVERITY_RANK } from './types';
 
 export interface TreeNode {
   label: string;
@@ -6,6 +6,8 @@ export interface TreeNode {
   // Location to reveal on click, if any.
   file?: string;
   line?: number;
+  // The underlying finding for finding leaf nodes; drives the detail panel.
+  finding?: Finding;
   children?: TreeNode[];
 }
 
@@ -26,6 +28,7 @@ export function buildTree(result: ScanResult, minSeverity: Severity): TreeNode[]
         description: f.title,
         file: f.file_path || undefined,
         line: f.line || undefined,
+        finding: f,
       })),
     });
   }

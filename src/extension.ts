@@ -7,6 +7,8 @@ import { buildDiagnostics } from './diagnostics';
 import { publishDiagnostics } from './diagnosticsView';
 import { FindingsTreeProvider } from './treeView';
 import { TreeNode } from './treeModel';
+import { Finding } from './types';
+import { showFinding, setRoot as setDetailRoot } from './detailView';
 
 const RELEVANT = /\.(py|ts|tsx|mts|cts)$|\.claude[\\/]agents[\\/].*\.md$|(pyproject\.toml|requirements\.txt|Pipfile|poetry\.lock|package\.json|go\.mod)$/;
 
@@ -31,11 +33,13 @@ export function activate(ctx: vscode.ExtensionContext): void {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
   tree = new FindingsTreeProvider(root);
   treeView = vscode.window.createTreeView('trustablFindings', { treeDataProvider: tree });
+  setDetailRoot(root);
 
   ctx.subscriptions.push(
     diagnostics, output, status, treeView,
     vscode.commands.registerCommand('trustabl.scanWorkspace', () => scan(ctx, false, false)),
     vscode.commands.registerCommand('trustabl.refreshRules', () => scan(ctx, true, false)),
+    vscode.commands.registerCommand('trustabl.showFinding', (f: Finding) => showFinding(f)),
     vscode.workspace.onDidSaveTextDocument((doc) => onSave(ctx, doc)),
     vscode.workspace.onDidChangeWorkspaceFolders(() => maybeAutoScan(ctx)),
   );
@@ -76,6 +80,7 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
     return;
   }
   const root = folder.uri.fsPath;
+  setDetailRoot(root);
   const cfg = readConfig();
 
   // Supersede any in-flight scan.
