@@ -1,0 +1,44 @@
+{
+  "scan_id": "test-scan-id",
+  "repo": "fixture-repo",
+  "languages": ["python"],
+  "sdks": ["openai_agents"],
+  "has_shell_invocations": false,
+  "findings": [
+    {
+      "rule_id": "OAI-016",
+      "category": "openai_sdk",
+      "scope": "tool",
+      "severity": "high",
+      "tool_name": "fetch_url",
+      "file_path": "src/tools.py",
+      "line": 12,
+      "title": "HTTP call without timeout",
+      "explanation": "fetch_url issues an HTTP request with no timeout, so a slow host can hang the agent.",
+      "suggested_fix": "Pass a timeout to the request call.",
+      "confidence": 0.9
+    },
+    {
+      "rule_id": "META-001",
+      "category": "openai_sdk",
+      "scope": "",
+      "severity": "info",
+      "tool_name": "",
+      "file_path": "",
+      "line": 0,
+      "title": "Unaudited SDK observed",
+      "explanation": "This repo uses an SDK Trustabl does not currently audit.",
+      "suggested_fix": "",
+      "confidence": 0.5
+    }
+  ],
+  "surfaces": [
+    { "kind": "tool", "name": "fetch_url", "file_path": "src/tools.py", "score": 0.4, "finding_count": 1, "weighted_severity": 0.7 },
+    { "kind": "repo", "name": "", "file_path": "", "score": 0.8, "finding_count": 1, "weighted_severity": 0.05 }
+  ],
+  "overall_score": 0.6,
+  "rules_source": "https://github.com/trustabl/trustabl-rules",
+  "rules_version": "abc1234",
+  "rules_from_cache": false,
+  "coverage": { "files_parsed": 3, "files_skipped": 1, "skipped_files": ["src/broken.py"] }
+}
