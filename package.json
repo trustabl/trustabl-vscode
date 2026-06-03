@@ -9,6 +9,7 @@
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Linters"],
   "main": "./dist/extension.js",
+  "icon": "media/icon.png",
   "activationEvents": ["onStartupFinished"],
   "contributes": {
     "commands": [

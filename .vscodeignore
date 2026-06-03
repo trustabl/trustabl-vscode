@@ -10,3 +10,4 @@ tsconfig.json
 .gitattributes
 **/*.map
 **/*.ts
+media/icon-source.svg
