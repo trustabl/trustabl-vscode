@@ -17,8 +17,16 @@ describe('parseScanResult', () => {
     assert.strictEqual(r.coverage.files_skipped, 1);
   });
 
-  it('throws on JSON without a findings array', () => {
-    assert.throws(() => parseScanResult('{"repo":"x"}'));
+  it('treats null/absent findings as an empty array (clean scan → Go nil slice → null)', () => {
+    // A repo with zero findings: the engine marshals the nil slice as `null`.
+    assert.deepStrictEqual(parseScanResult('{"findings":null,"surfaces":[]}').findings, []);
+    assert.deepStrictEqual(parseScanResult('{"repo":"x"}').findings, []);
+  });
+
+  it('throws on non-object JSON', () => {
+    assert.throws(() => parseScanResult('null'), /expected a JSON object/);
+    assert.throws(() => parseScanResult('42'), /expected a JSON object/);
+    assert.throws(() => parseScanResult('"nope"'), /expected a JSON object/);
   });
 
   it('ranks severities low to high', () => {
