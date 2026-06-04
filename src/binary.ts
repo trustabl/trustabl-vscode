@@ -66,7 +66,7 @@ export async function downloadVerifyExtract(spec: DownloadSpec): Promise<string>
 
 function versionOf(binPath: string): string | null {
   try {
-    const out = cp.execFileSync(binPath, ['version'], { encoding: 'utf8' });
+    const out = cp.execFileSync(binPath, ['version'], { encoding: 'utf8', timeout: 5000 });
     return parseVersion(out);
   } catch { return null; }
 }
@@ -74,7 +74,7 @@ function versionOf(binPath: string): string | null {
 function onPath(): string | null {
   const probe = process.platform === 'win32' ? 'where' : 'which';
   try {
-    const out = cp.execFileSync(probe, ['trustabl'], { encoding: 'utf8' });
+    const out = cp.execFileSync(probe, ['trustabl'], { encoding: 'utf8', timeout: 5000 });
     const first = out.split(/\r?\n/).find((l) => l.trim().length > 0);
     return first ? first.trim() : null;
   } catch { return null; }
