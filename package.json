@@ -42,7 +42,7 @@
         "trustabl.scanOnSave": { "type": "boolean", "default": true, "description": "Run a scan when a relevant file is saved." },
         "trustabl.scanOnOpen": { "type": "boolean", "default": true, "description": "Automatically scan the workspace when it is opened." },
         "trustabl.groupBy": { "type": "string", "enum": ["severity", "file", "scope", "rule"], "default": "severity", "description": "How to group findings in the Trustabl view." },
-        "trustabl.detectors": { "type": "string", "default": "", "description": "Comma-separated detector categories (claude_sdk, openai_sdk, google_adk). Empty = all." },
+        "trustabl.detectors": { "type": "string", "default": "", "description": "Comma-separated detector categories (claude_sdk, openai_sdk, google_adk, mcp, langchain, crewai, pydantic_ai, vercel_ai, autogen). Empty = all." },
         "trustabl.strict": { "type": "boolean", "default": false, "description": "Pass --strict to the CLI (affects exit code only, not display)." },
         "trustabl.minSeverity": { "type": "string", "enum": ["info", "low", "medium", "high", "critical"], "default": "info", "description": "Hide findings below this severity." },
         "trustabl.scanTimeoutSeconds": { "type": "number", "default": 120, "description": "Kill a scan after this many seconds." },

@@ -33,7 +33,8 @@ See the `Trustabl` section in Settings:
 - `trustabl.groupBy` — how to group findings in the Trustabl view
   (`severity` | `file` | `scope` | `rule`; default `severity`).
 - `trustabl.detectors` — comma-separated detector categories
-  (`claude_sdk`, `openai_sdk`, `google_adk`). Empty = all.
+  (`claude_sdk`, `openai_sdk`, `google_adk`, `mcp`, `langchain`, `crewai`,
+  `pydantic_ai`, `vercel_ai`, `autogen`). Empty = all.
 - `trustabl.minSeverity` — hide findings below this severity
   (`info` | `low` | `medium` | `high` | `critical`).
 - `trustabl.strict` — pass `--strict` (affects the CLI exit code only).
