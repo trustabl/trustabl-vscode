@@ -6,18 +6,29 @@ import { Canceller } from './process';
 import { buildDiagnostics } from './diagnostics';
 import { publishDiagnostics } from './diagnosticsView';
 import { NodeTreeProvider } from './treeView';
-import { buildFindings, buildScores, buildHelp, findingsCount, TreeNode } from './treeModel';
-import { Finding, GroupBy, ScanResult, Severity } from './types';
-import { showFinding, setRoot as setDetailRoot } from './detailView';
+import {
+  buildFindings, buildScores, buildHelp, buildDependencies, buildVulnerabilities,
+  findingsCount, dependenciesCount, vulnerabilitiesCount, TreeNode,
+} from './treeModel';
+import { DepVuln, Finding, GroupBy, ScanResult, Severity } from './types';
+import { showFinding, showVuln, setRoot as setDetailRoot } from './detailView';
 
-const RELEVANT = /\.(py|ts|tsx|mts|cts)$|\.claude[\\/]agents[\\/].*\.md$|(pyproject\.toml|requirements\.txt|Pipfile|poetry\.lock|package\.json|go\.mod)$/;
+const RELEVANT = /\.(py|ts|tsx|mts|cts|csproj)$|\.claude[\\/]agents[\\/].*\.md$|(pyproject\.toml|requirements\.txt|Pipfile|poetry\.lock|package\.json|go\.mod|Cargo\.toml|composer\.json)$/;
+
+// First-run --vuln-scan downloads the OSV database, which can exceed the normal
+// scan timeout; give the vuln path at least this long.
+const VULN_MIN_TIMEOUT_MS = 300_000;
 
 let diagnostics: vscode.DiagnosticCollection;
 let status: vscode.StatusBarItem;
 let output: vscode.OutputChannel;
 let findings: NodeTreeProvider;
 let scores: NodeTreeProvider;
+let deps: NodeTreeProvider;
+let vulns: NodeTreeProvider;
 let findingsView: vscode.TreeView<TreeNode>;
+let depsView: vscode.TreeView<TreeNode>;
+let vulnsView: vscode.TreeView<TreeNode>;
 let debounceTimer: NodeJS.Timeout | undefined;
 let inFlight: { cancel: () => void } | undefined;
 let rulesWarmed = false;
@@ -36,18 +47,24 @@ export function activate(ctx: vscode.ExtensionContext): void {
   currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
   findings = new NodeTreeProvider(currentRoot);
   scores = new NodeTreeProvider(currentRoot);
+  deps = new NodeTreeProvider(currentRoot);
+  vulns = new NodeTreeProvider(currentRoot);
   const help = new NodeTreeProvider(currentRoot);
   help.setNodes(buildHelp());
   findingsView = vscode.window.createTreeView('trustablFindings', { treeDataProvider: findings });
   const scoresView = vscode.window.createTreeView('trustablScores', { treeDataProvider: scores });
+  depsView = vscode.window.createTreeView('trustablDependencies', { treeDataProvider: deps });
+  vulnsView = vscode.window.createTreeView('trustablVulnerabilities', { treeDataProvider: vulns });
   const helpView = vscode.window.createTreeView('trustablHelp', { treeDataProvider: help });
   setDetailRoot(currentRoot);
 
   ctx.subscriptions.push(
-    diagnostics, output, status, findingsView, scoresView, helpView,
-    vscode.commands.registerCommand('trustabl.scanWorkspace', () => scan(ctx, false, false)),
-    vscode.commands.registerCommand('trustabl.refreshRules', () => scan(ctx, true, false)),
+    diagnostics, output, status, findingsView, scoresView, depsView, vulnsView, helpView,
+    vscode.commands.registerCommand('trustabl.scanWorkspace', () => scan(ctx, false, false, false)),
+    vscode.commands.registerCommand('trustabl.refreshRules', () => scan(ctx, true, false, false)),
+    vscode.commands.registerCommand('trustabl.scanWithVulns', () => scan(ctx, false, false, true)),
     vscode.commands.registerCommand('trustabl.showFinding', (f: Finding) => showFinding(f)),
+    vscode.commands.registerCommand('trustabl.showVuln', (v: DepVuln) => showVuln(v)),
     vscode.commands.registerCommand('trustabl.groupBy', () => pickGroupBy()),
     vscode.workspace.onDidSaveTextDocument((doc) => onSave(ctx, doc)),
     vscode.workspace.onDidChangeWorkspaceFolders(() => maybeAutoScan(ctx)),
@@ -71,9 +88,19 @@ function render(result: ScanResult, minSeverity: Severity, groupBy: GroupBy): vo
   publishDiagnostics(diagnostics, buildDiagnostics(result, currentRoot, minSeverity));
   findings.setNodes(buildFindings(result, minSeverity, groupBy));
   scores.setNodes(buildScores(result));
+  deps.setNodes(buildDependencies(result));
+  vulns.setNodes(buildVulnerabilities(result));
+
   const n = findingsCount(result, minSeverity);
   findingsView.badge = n > 0 ? { value: n, tooltip: `${n} Trustabl finding(s)` } : undefined;
   findingsView.description = n > 0 ? `${n}` : undefined;
+
+  const d = dependenciesCount(result);
+  depsView.description = d > 0 ? `${d}` : undefined;
+
+  const v = vulnerabilitiesCount(result);
+  vulnsView.badge = v > 0 ? { value: v, tooltip: `${v} known vulnerability(ies)` } : undefined;
+  vulnsView.description = v > 0 ? `${v}` : undefined;
 }
 
 // Re-render from the last scan (e.g. when grouping / min-severity changes).
@@ -104,7 +131,7 @@ function maybeAutoScan(ctx: vscode.ExtensionContext): void {
     output.appendLine('Trustabl: no folder open at startup; will scan when a folder is opened.');
     return;
   }
-  void scan(ctx, false, true);
+  void scan(ctx, false, true, false);
 }
 
 function onSave(ctx: vscode.ExtensionContext, doc: vscode.TextDocument): void {
@@ -112,10 +139,12 @@ function onSave(ctx: vscode.ExtensionContext, doc: vscode.TextDocument): void {
   if (!cfg.scanOnSave) return;
   if (!RELEVANT.test(doc.fileName)) return;
   if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => scan(ctx, false, true), 750);
+  debounceTimer = setTimeout(() => scan(ctx, false, true, false), 750);
 }
 
-async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boolean): Promise<void> {
+// vuln=true forces --vuln-scan for this run (the "Scan with Vulnerabilities"
+// command); otherwise the configured trustabl.vulnScan setting decides.
+async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boolean, vuln: boolean): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
     output.appendLine('Trustabl: no workspace folder open; nothing to scan.');
@@ -126,14 +155,17 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
   currentRoot = root;
   findings.setRoot(root);
   scores.setRoot(root);
+  deps.setRoot(root);
+  vulns.setRoot(root);
   setDetailRoot(root);
   const cfg = readConfig();
+  const wantVuln = vuln || cfg.vulnScan;
 
   inFlight?.cancel();
   let cancelled = false;
   const token: Canceller = { onCancel: (cb) => { inFlight = { cancel: () => { cancelled = true; cb(); } }; } };
 
-  status.text = '$(sync~spin) Trustabl: scanning';
+  status.text = wantVuln ? '$(sync~spin) Trustabl: scanning (vulns)' : '$(sync~spin) Trustabl: scanning';
 
   let binary: string;
   try {
@@ -150,8 +182,10 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
   }
 
   const cachedRules = !freshRules && rulesWarmed;
-  output.appendLine(`Trustabl: scanning ${root} (rules: ${cachedRules ? 'cached' : 'fetch'}; binary: ${binary})`);
-  const outcome = await runScan(binary, root, toScanOptions(cfg, cachedRules), token);
+  const opts = toScanOptions(cfg, cachedRules, wantVuln);
+  if (wantVuln) opts.timeoutMs = Math.max(opts.timeoutMs, VULN_MIN_TIMEOUT_MS);
+  output.appendLine(`Trustabl: scanning ${root} (rules: ${cachedRules ? 'cached' : 'fetch'}; vulns: ${wantVuln ? 'on' : 'off'}; binary: ${binary})`);
+  const outcome = await runScan(binary, root, opts, token);
   if (cancelled) return;
   inFlight = undefined;
 
@@ -172,8 +206,9 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
   render(outcome.result, cfg.minSeverity, cfg.groupBy);
 
   const n = findingsCount(outcome.result, cfg.minSeverity);
-  status.text = n > 0 ? `$(warning) Trustabl: ${n}` : '$(check) Trustabl';
-  output.appendLine(`Trustabl: done, ${outcome.result.findings.length} finding(s).`);
+  const v = vulnerabilitiesCount(outcome.result);
+  status.text = n > 0 || v > 0 ? `$(warning) Trustabl: ${n}${v > 0 ? ` (${v} vuln)` : ''}` : '$(check) Trustabl';
+  output.appendLine(`Trustabl: done, ${outcome.result.findings.length} finding(s)${wantVuln ? `, ${v} vulnerability(ies)` : ''}.`);
   if (outcome.result.coverage.files_skipped > 0) {
     output.appendLine(`Trustabl: note: ${outcome.result.coverage.files_skipped} file(s) skipped; findings may be incomplete.`);
   }

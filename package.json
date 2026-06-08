@@ -15,11 +15,13 @@
     "commands": [
       { "command": "trustabl.scanWorkspace", "title": "Trustabl: Scan Workspace" },
       { "command": "trustabl.refreshRules", "title": "Trustabl: Refresh Rules and Scan" },
+      { "command": "trustabl.scanWithVulns", "title": "Trustabl: Scan with Vulnerabilities", "icon": "$(shield)" },
       { "command": "trustabl.groupBy", "title": "Trustabl: Group Findings By…", "icon": "$(list-tree)" }
     ],
     "menus": {
       "view/title": [
-        { "command": "trustabl.groupBy", "when": "view == trustablFindings", "group": "navigation" }
+        { "command": "trustabl.groupBy", "when": "view == trustablFindings", "group": "navigation" },
+        { "command": "trustabl.scanWithVulns", "when": "view == trustablVulnerabilities", "group": "navigation" }
       ]
     },
     "viewsContainers": {
@@ -29,11 +31,15 @@
       "trustabl": [
         { "id": "trustablFindings", "name": "Findings" },
         { "id": "trustablScores", "name": "Scores" },
+        { "id": "trustablDependencies", "name": "Dependencies" },
+        { "id": "trustablVulnerabilities", "name": "Vulnerabilities" },
         { "id": "trustablHelp", "name": "Help & Feedback" }
       ]
     },
     "viewsWelcome": [
-      { "view": "trustablFindings", "contents": "No Trustabl findings to show yet.\nRun a scan to populate this view.\n[Scan workspace](command:trustabl.scanWorkspace)" }
+      { "view": "trustablFindings", "contents": "No Trustabl findings to show yet.\nRun a scan to populate this view.\n[Scan workspace](command:trustabl.scanWorkspace)" },
+      { "view": "trustablDependencies", "contents": "No dependencies discovered yet.\nRun a scan to build the dependency bill of materials.\n[Scan workspace](command:trustabl.scanWorkspace)" },
+      { "view": "trustablVulnerabilities", "contents": "No vulnerability scan results.\nMatching dependencies against the OSV database downloads it on first use.\n[Scan with Vulnerabilities](command:trustabl.scanWithVulns)" }
     ],
     "configuration": {
       "title": "Trustabl",
@@ -47,7 +53,8 @@
         "trustabl.minSeverity": { "type": "string", "enum": ["info", "low", "medium", "high", "critical"], "default": "info", "description": "Hide findings below this severity." },
         "trustabl.scanTimeoutSeconds": { "type": "number", "default": 120, "description": "Kill a scan after this many seconds." },
         "trustabl.rulesRepo": { "type": "string", "default": "", "description": "Override the rules repository URL (advanced)." },
-        "trustabl.rulesRef": { "type": "string", "default": "", "description": "Rules branch or tag (advanced)." }
+        "trustabl.rulesRef": { "type": "string", "default": "", "description": "Rules branch or tag (advanced)." },
+        "trustabl.vulnScan": { "type": "boolean", "default": false, "description": "Match declared dependencies against the OSV vulnerability database on every scan (passes --vuln-scan). Off by default — it does network I/O and downloads the OSV database on first use. Run a one-off check anytime via 'Trustabl: Scan with Vulnerabilities'." }
       }
     }
   },

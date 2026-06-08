@@ -44,7 +44,7 @@ export function buildDiagnostics(
     if (SEVERITY_RANK[f.severity] < floor) continue;
     const hasLoc = !!f.file_path;
     const file = hasLoc ? path.resolve(workspaceRoot, f.file_path) : anchor;
-    const line = hasLoc && f.line > 0 ? f.line - 1 : 0; // CLI lines are 1-based
+    const line = hasLoc && f.start_line > 0 ? f.start_line - 1 : 0; // CLI lines are 1-based
     const entry: DiagnosticInput = {
       file, line, severity: f.severity, code: f.rule_id, message: formatMessage(f),
     };
