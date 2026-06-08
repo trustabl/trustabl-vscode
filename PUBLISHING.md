@@ -56,7 +56,7 @@ New repository secret** (needs repo admin):
 1. Bump `"version"` in `package.json` (e.g. `0.1.0` → `0.1.1`). Both registries reject
    re-publishing the same version.
 2. Confirm `PINNED_CLI_VERSION` in `src/binary.ts` points at a **published**
-   `trustabl/trustabl` engine release that has assets (currently `0.1.2`). Bump it as the
+   `trustabl/trustabl` engine release that has assets (currently `0.1.4`). Bump it as the
    engine releases.
 3. (Optional) update a `CHANGELOG`.
 4. Commit, then tag and push the tag (push via the gh credential helper, not bare

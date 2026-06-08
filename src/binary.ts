@@ -9,7 +9,9 @@ import { sha256File } from './hash';
 import { parseVersion, satisfiesPin } from './version';
 
 // The single CLI version this extension's JSON parser is built against.
-export const PINNED_CLI_VERSION = '0.1.2';
+// 0.1.4 is the first release with the dependency BOM, --vuln-scan, and the
+// start_line/end_line finding ranges the views and parser depend on.
+export const PINNED_CLI_VERSION = '0.1.4';
 const RELEASE_BASE = 'https://github.com/trustabl/trustabl/releases/download';
 
 export class BinaryUnavailableError extends Error {}
