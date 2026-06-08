@@ -8,6 +8,8 @@ tsconfig.json
 .mocharc.json
 .vscode-test.mjs
 .gitattributes
+.gitignore
+.claude/**
 **/*.map
 **/*.ts
 media/icon-source.svg
