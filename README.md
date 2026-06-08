@@ -15,6 +15,49 @@ and is populated only when a scan runs with the OSV vulnerability check (see
 The extension does not bundle a scanner, import SARIF, or run a language
 server — it shells out to the `trustabl` CLI and parses its JSON report.
 
+## Install
+
+The extension isn't on the VS Code Marketplace / Open VSX yet, so install it
+from a locally built `.vsix`.
+
+### 1. Build the VSIX
+
+Requires Node.js 18+.
+
+```bash
+npm ci            # install dev dependencies (first time only)
+npm run package   # bundles, then writes trustabl-<version>.vsix to the repo root
+```
+
+`npm run package` runs `vsce package` (after `npm run bundle`) and writes
+`trustabl-<version>.vsix` to the repo root — e.g. `trustabl-0.1.0.vsix`.
+
+### 2. Install the VSIX
+
+VS Code, Cursor, Windsurf, VSCodium, and other VS Code-compatible editors all
+accept a VSIX two ways:
+
+- **From the UI** — open the Extensions view (`Ctrl`/`Cmd`+`Shift`+`X`), click
+  the `…` menu at the top of the panel, choose **Install from VSIX…**, and pick
+  the file.
+- **From the editor's CLI** — each fork ships its own command:
+
+  ```bash
+  code     --install-extension trustabl-0.1.0.vsix   # VS Code
+  cursor   --install-extension trustabl-0.1.0.vsix   # Cursor
+  windsurf --install-extension trustabl-0.1.0.vsix   # Windsurf
+  codium   --install-extension trustabl-0.1.0.vsix   # VSCodium
+  ```
+
+  Pass `--force` to replace an already-installed copy. If the command isn't
+  found, install it from the editor's command palette (e.g. **Shell Command:
+  Install 'code' command in PATH**, or the `cursor`/`windsurf` equivalent), then
+  reopen your terminal.
+
+Reload the window afterwards (**Developer: Reload Window**). You don't need to
+install the `trustabl` CLI separately — the extension resolves or downloads a
+compatible binary on first scan (see [How it works](#how-it-works)).
+
 ## How it works
 
 On save of a relevant file (Python/TypeScript source, `.claude/agents/*.md`,
