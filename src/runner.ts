@@ -8,6 +8,8 @@ export interface ScanOptions {
   strict?: boolean;
   rulesRepo?: string;
   rulesRef?: string;
+  // Match declared dependencies against the OSV snapshot (--vuln-scan).
+  vulnScan?: boolean;
 }
 
 export type ScanOutcome =
@@ -19,6 +21,7 @@ export function buildArgs(folder: string, opts: ScanOptions): string[] {
   if (opts.cachedRules) args.push('--no-rules-update');
   if (opts.detectors) args.push('--detectors', opts.detectors);
   if (opts.strict) args.push('--strict');
+  if (opts.vulnScan) args.push('--vuln-scan');
   if (opts.rulesRepo) args.push('--rules-repo', opts.rulesRepo);
   if (opts.rulesRef) args.push('--rules-ref', opts.rulesRef);
   return args;

@@ -16,6 +16,10 @@ describe('buildArgs', () => {
     assert.ok(args.includes('--detectors') && args.includes('claude_sdk'));
     assert.ok(args.includes('--strict'));
   });
+  it('adds --vuln-scan only when vulnScan is set', () => {
+    assert.ok(buildArgs('/repo', { cachedRules: true, timeoutMs: 1, vulnScan: true }).includes('--vuln-scan'));
+    assert.ok(!buildArgs('/repo', { cachedRules: true, timeoutMs: 1 }).includes('--vuln-scan'));
+  });
 });
 
 describe('runScan', () => {

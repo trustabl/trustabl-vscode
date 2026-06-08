@@ -30,11 +30,15 @@ export class NodeTreeProvider implements vscode.TreeDataProvider<TreeNode> {
       : vscode.TreeItemCollapsibleState.None;
     const item = new vscode.TreeItem(node.label, collapsible);
     item.description = node.description;
+    if (node.tooltip) item.tooltip = node.tooltip;
     if (node.icon) item.iconPath = new vscode.ThemeIcon(node.icon);
 
     if (node.finding) {
       item.tooltip = node.finding.explanation;
       item.command = { command: 'trustabl.showFinding', title: 'Show finding', arguments: [node.finding] };
+    } else if (node.vuln) {
+      item.tooltip = node.vuln.summary || `${node.vuln.dep.name} ${node.vuln.dep.version ?? ''}`.trim();
+      item.command = { command: 'trustabl.showVuln', title: 'Show vulnerability', arguments: [node.vuln] };
     } else if (node.url) {
       item.command = { command: 'vscode.open', title: 'Open', arguments: [vscode.Uri.parse(node.url)] };
     } else if (node.file) {

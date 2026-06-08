@@ -13,6 +13,7 @@ export interface TrustablConfig {
   timeoutMs: number;
   rulesRepo: string;
   rulesRef: string;
+  vulnScan: boolean;
 }
 
 export function readConfig(): TrustablConfig {
@@ -28,10 +29,13 @@ export function readConfig(): TrustablConfig {
     timeoutMs: c.get<number>('scanTimeoutSeconds', 120) * 1000,
     rulesRepo: c.get<string>('rulesRepo', ''),
     rulesRef: c.get<string>('rulesRef', ''),
+    vulnScan: c.get<boolean>('vulnScan', false),
   };
 }
 
-export function toScanOptions(c: TrustablConfig, cachedRules: boolean): ScanOptions {
+// vulnScan defaults to the configured setting; the dedicated "Scan with
+// Vulnerabilities" command passes true to force it for a single run.
+export function toScanOptions(c: TrustablConfig, cachedRules: boolean, vulnScan: boolean = c.vulnScan): ScanOptions {
   return {
     cachedRules,
     timeoutMs: c.timeoutMs,
@@ -39,5 +43,6 @@ export function toScanOptions(c: TrustablConfig, cachedRules: boolean): ScanOpti
     strict: c.strict,
     rulesRepo: c.rulesRepo || undefined,
     rulesRef: c.rulesRef || undefined,
+    vulnScan,
   };
 }
