@@ -1,10 +1,11 @@
 # Trustabl for VS Code and Cursor
 
-Runs the [Trustabl](https://github.com/trustabl/trustabl) agent-reliability
-scanner on save and surfaces findings as native diagnostics (Problems panel),
-in a Trustabl activity-bar sidebar (Findings / Scores / Dependencies /
-Vulnerabilities / Help & Feedback, with per-surface readiness scores), and in a
-webview detail panel when you click a finding or a vulnerability.
+Runs the [Trustabl](https://github.com/trustabl/agent-reliability-analyzer)
+agent-reliability scanner on save and surfaces findings as native diagnostics
+(Problems panel), in a Trustabl activity-bar sidebar (Findings / Scores /
+Dependencies / Vulnerabilities / Help & Feedback, with per-surface readiness
+scores), and in a webview detail panel when you click a finding or a
+vulnerability.
 
 The **Dependencies** view is the repo's bill of materials (every declared
 dependency, grouped by ecosystem) and is populated on every scan. The

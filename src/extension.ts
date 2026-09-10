@@ -176,7 +176,7 @@ async function scan(ctx: vscode.ExtensionContext, freshRules: boolean, auto: boo
     const msg = e instanceof BinaryUnavailableError ? e.message : String(e);
     output.appendLine(`Trustabl: binary error: ${msg}`);
     vscode.window.showErrorMessage(`Trustabl: ${msg}`, 'Install Instructions').then((pick) => {
-      if (pick) vscode.env.openExternal(vscode.Uri.parse('https://github.com/trustabl/trustabl#install'));
+      if (pick) vscode.env.openExternal(vscode.Uri.parse('https://github.com/trustabl/agent-reliability-analyzer#install'));
     });
     return;
   }

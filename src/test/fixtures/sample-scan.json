@@ -54,7 +54,7 @@
     }
   ],
   "overall_score": 0.6,
-  "rules_source": "https://github.com/trustabl/trustabl-rules",
+  "rules_source": "https://github.com/trustabl/agent-reliability-rules",
   "rules_version": "abc1234",
   "rules_from_cache": false,
   "coverage": { "files_parsed": 3, "files_skipped": 1, "skipped_files": ["src/broken.py"] }
