@@ -206,9 +206,9 @@ export function buildVulnerabilities(result: ScanResult): TreeNode[] {
 // Static links for the Help & Feedback view.
 export function buildHelp(): TreeNode[] {
   return [
-    { label: 'Documentation', icon: 'book', url: 'https://github.com/trustabl/trustabl#readme' },
+    { label: 'Documentation', icon: 'book', url: 'https://github.com/trustabl/agent-reliability-analyzer#readme' },
     { label: 'Rule docs (rulebook)', icon: 'law', url: 'https://github.com/trustabl/trustabl-rulebook' },
     { label: 'Report a Bug', icon: 'bug', url: 'https://github.com/trustabl/trustabl-vscode/issues/new' },
-    { label: 'Trustabl on GitHub', icon: 'github', url: 'https://github.com/trustabl/trustabl' },
+    { label: 'Trustabl on GitHub', icon: 'github', url: 'https://github.com/trustabl/agent-reliability-analyzer' },
   ];
 }
