@@ -18,8 +18,16 @@ server — it shells out to the `trustabl` CLI and parses its JSON report.
 
 ## Install
 
-The extension isn't on the VS Code Marketplace / Open VSX yet, so install it
-from a locally built `.vsix`.
+### VS Code
+
+Search **Trustabl** in the Extensions view, or install it from the
+[Marketplace listing](https://marketplace.visualstudio.com/items?itemName=trustabl.trustabl).
+
+### Cursor, Windsurf, VSCodium
+
+These read the [Open VSX](https://open-vsx.org) registry, where the extension is
+not published yet, so install from a `.vsix` instead. The steps below also cover
+installing a development build into any of these editors, VS Code included.
 
 ### 1. Build the VSIX
 
