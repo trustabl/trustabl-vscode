@@ -1,0 +1,74 @@
+# Opens a pull request when the analyzer publishes a release newer than the one
+# the extension pins (PINNED_CLI_VERSION in src/binary.ts).
+#
+# This exists because the alternative is remembering: the pin sat at 0.1.4
+# while the analyzer shipped twelve releases. A pull request is the cheapest
+# thing that makes the gap visible without taking the choice away: nothing
+# ships until a human merges it and cuts a release (PUBLISHING.md).
+name: engine-bump
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'     # Mondays, 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CURRENT=$(sed -n "s/^export const PINNED_CLI_VERSION = '\([0-9][0-9.]*\)';.*/\1/p" src/binary.ts)
+          [ -n "$CURRENT" ] || { echo "::error::no PINNED_CLI_VERSION in src/binary.ts"; exit 1; }
+          RELEASE=$(gh api repos/trustabl/agent-reliability-analyzer/releases/latest)
+          LATEST=$(echo "$RELEASE" | jq -r '.tag_name | ltrimstr("v")')
+          HAS_SUMS=$(echo "$RELEASE" | jq -r 'any(.assets[]; .name == "checksums.txt")')
+          echo "Pinned $CURRENT, latest $LATEST (checksums.txt published: $HAS_SUMS)"
+          BUMP=false
+          # Only a newer release, and only once its checksums.txt is up: the
+          # extension refuses to install a download it cannot verify.
+          if [ "$LATEST" != "$CURRENT" ] && [ "$HAS_SUMS" = true ] &&
+             [ "$(printf '%s\n%s\n' "$CURRENT" "$LATEST" | sort -V | tail -n1)" = "$LATEST" ]; then
+            BUMP=true
+          fi
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST"   >> "$GITHUB_OUTPUT"
+          echo "bump=$BUMP"       >> "$GITHUB_OUTPUT"
+      - name: Bump the pin
+        if: steps.versions.outputs.bump == 'true'
+        env:
+          LATEST: ${{ steps.versions.outputs.latest }}
+        run: |
+          V='[0-9]+\.[0-9]+\.[0-9]+'
+          sed -i -E "s/^(export const PINNED_CLI_VERSION = ')$V(';)/\1$LATEST\2/" src/binary.ts
+          # PUBLISHING.md names the current pin; the line break inside it is in the file.
+          perl -0pi -e "s/\(currently(\s+)\`$V\`\)/(currently\1\`$LATEST\`)/" PUBLISHING.md
+          git diff --stat
+      - uses: peter-evans/create-pull-request@v7
+        if: steps.versions.outputs.bump == 'true'
+        with:
+          branch: chore/analyzer-${{ steps.versions.outputs.latest }}
+          title: "chore(deps): pin the analyzer to ${{ steps.versions.outputs.latest }}"
+          commit-message: "chore(deps): pin the analyzer to ${{ steps.versions.outputs.latest }}"
+          body: |
+            The analyzer released `${{ steps.versions.outputs.latest }}`; the extension pins
+            `${{ steps.versions.outputs.current }}`.
+
+            This pull request moves `PINNED_CLI_VERSION` in `src/binary.ts` (the download is still
+            verified against the release's `checksums.txt`) and the note in `PUBLISHING.md`.
+            It does not bump the extension version or publish anything: cutting a release is still
+            the manual step in `PUBLISHING.md`.
+
+            Before merging:
+            - CI does not start on its own for a pull request opened by this workflow (GitHub
+              does not trigger workflows from `GITHUB_TOKEN` events). Close and reopen the pull
+              request to run it.
+            - Read the analyzer's release notes. The parser reads only the fields in
+              `src/types.ts`; a release that renames one needs the parser updating here too.

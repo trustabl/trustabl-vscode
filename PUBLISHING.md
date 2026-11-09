@@ -57,7 +57,7 @@ New repository secret** (needs repo admin):
    re-publishing the same version.
 2. Confirm `PINNED_CLI_VERSION` in `src/binary.ts` points at a **published**
    `trustabl/agent-reliability-analyzer` engine release that has assets (currently
-   `0.1.4`). Bump it as the engine releases.
+   `0.1.16`). Bump it as the engine releases.
 3. (Optional) update a `CHANGELOG`.
 4. Commit, then tag and push the tag (push via the gh credential helper, not bare
    `git push`):
