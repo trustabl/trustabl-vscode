@@ -8,10 +8,12 @@ import { assetNameFor, parseChecksums } from './assets';
 import { sha256File } from './hash';
 import { parseVersion, satisfiesPin } from './version';
 
-// The single CLI version this extension's JSON parser is built against.
-// 0.1.4 is the first release with the dependency BOM, --vuln-scan, and the
-// start_line/end_line finding ranges the views and parser depend on.
-export const PINNED_CLI_VERSION = '0.1.4';
+// The single CLI version this extension downloads, and the only one it accepts
+// from PATH. The JSON parser needs 0.1.4 or later (the first release with the
+// dependency BOM, --vuln-scan, and the start_line/end_line finding ranges the
+// views and parser depend on); this pins the latest analyzer release.
+// .github/workflows/engine-bump.yml proposes a bump when the analyzer releases.
+export const PINNED_CLI_VERSION = '0.1.16';
 const RELEASE_BASE = 'https://github.com/trustabl/agent-reliability-analyzer/releases/download';
 
 export class BinaryUnavailableError extends Error {}
